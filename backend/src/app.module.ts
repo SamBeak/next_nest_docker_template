@@ -7,6 +7,7 @@ import { CommonModule } from './common/common.module';
 import { LogMiddleware } from './common/middleware/log.middleware';
 import { NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { RequestMethod } from '@nestjs/common';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { RequestMethod } from '@nestjs/common';
 		}),
 	}),
 	CommonModule,
+	AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
