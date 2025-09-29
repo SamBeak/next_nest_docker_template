@@ -1,12 +1,18 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { UsersModel } from 'src/users/entities/users.entity';
+import { BCRYPT_SALT_ROUNDS, JWT_EXPIRES_IN, JWT_REFRESH_EXPIRES_IN, JWT_SECRET } from 'src/common/const/env-keys.const';
+import { UsersService } from 'src/users/users.service';
+import * as bcrypt from 'bcrypt';
+import { RegisterUserDto } from './dto/register-user.dto';
 
 @Injectable()
 export class AuthService {
 	constructor(
 		private readonly jwtService: JwtService,
 		private readonly configService: ConfigService,
+		private readonly usersService: UsersService,
 	) {}
 	
 	// Header로부터 Token 추출
@@ -43,7 +49,7 @@ export class AuthService {
 	verifyToken(token: string) {
 		try {
 			return this.jwtService.verify(token, {
-				secret: this.configService.get<string>("ENV_JWT_SECRET_KEY"),
+				secret: this.configService.get<string>(JWT_SECRET),
 			});
 		}
 		catch(e) {
@@ -54,30 +60,74 @@ export class AuthService {
 	// Token 재발급
 	rotateToken(token: string, isRefreshToken: boolean) {
 		const decoded = this.jwtService.verify(token, {
-			secret: this.configService.get<string>("ENV_JWT_SECRET_KEY"),
+			secret: this.configService.get<string>(JWT_SECRET),
 			complete: true,
 		});
 		
 		if (decoded.type !== "refresh") {
 			throw new UnauthorizedException("Refresh token is required");
 		}
-		return true;
-		// return this.signToken({
-		// 	...decoded,
-		// }, isRefreshToken);
+		return this.signToken({
+			...decoded,
+		}, isRefreshToken);
 	}
 	
 	// Token 생성
-	// signToken(user: Pick<UsersModel, "email" | "id">, isRefreshToken: boolean) {
-	// 	const payload = {
-	// 		email: user.email,
-	// 		sub: user.id,
-	// 		type: isRefreshToken ? "refresh" : "access",
-	// 	}
+	signToken(user: Pick<UsersModel, "email" | "pkUsersIdx">, isRefreshToken: boolean) {
+		const payload = {
+			email: user.email,
+			sub: user.pkUsersIdx,
+			type: isRefreshToken ? "refresh" : "access",
+		}
 		
-	// 	return this.jwtService.sign(payload, {
-	// 		secret: this.configService.get<string>("ENV_JWT_SECRET_KEY"),
-	// 		expiresIn: isRefreshToken ? 3600 : 300,
-	// 	});
-	// }
+		return this.jwtService.sign(payload, {
+			secret: this.configService.get<string>(JWT_SECRET),
+			expiresIn: isRefreshToken ? this.configService.get<string>(JWT_REFRESH_EXPIRES_IN) : this.configService.get<string>(JWT_EXPIRES_IN),
+		});
+	}
+	
+	loginUser(user:Pick<UsersModel, "email" | "pkUsersIdx">) {
+		const accessToken = this.signToken(user, false);
+		const refreshToken = this.signToken(user, true);
+		
+		return {
+			accessToken,
+			refreshToken,
+		}
+	}
+	
+	async authenticateWithEmailAndPassword(user: Pick<UsersModel, "email" | "password">) {
+		const existingUser = await this.usersService.getUserByEmail(user.email);
+		
+		if (!existingUser) {
+			throw new UnauthorizedException("Invalid credentials");
+		}
+		
+		const passOk = await bcrypt.compare(user.password, existingUser.password);
+		if (!passOk) {
+			throw new UnauthorizedException("Invalid credentials");
+		}
+		
+		return existingUser;
+	}
+	
+	async loginWithEmail(user: Pick<UsersModel, "email" | "password">) {
+		const existingUser = await this.authenticateWithEmailAndPassword(user);
+		
+		return this.loginUser(existingUser);
+	}
+	
+	async registerWithEmail(user: RegisterUserDto) {
+		const hash = await bcrypt.hash(
+			user.password,
+			this.configService.get<number>(BCRYPT_SALT_ROUNDS),
+		);
+		
+		const newUser = await this.usersService.createUser({
+			...user,
+			password: hash,
+		});
+		
+		return this.loginUser(newUser);
+	}
 }

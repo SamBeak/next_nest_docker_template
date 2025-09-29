@@ -1,10 +1,6 @@
 import { Column, CreateDateColumn, UpdateDateColumn } from "typeorm";
-
-export enum DeleteFlag {
-	Y = "Y",
-	N = "N",
-}
-
+import { DeleteFlag } from "../const/delete-flag.const";
+import { VersionColumn } from "typeorm/browser";
 export abstract class BaseModel {
 	@CreateDateColumn()
 	createdAt: Date;
@@ -13,7 +9,7 @@ export abstract class BaseModel {
 	updatedAt: Date;
 	
 	@Column({
-		enum: DeleteFlag,
+		enum: Object.values(DeleteFlag),
 		default: DeleteFlag.N,
 	})
 	delYn: DeleteFlag;

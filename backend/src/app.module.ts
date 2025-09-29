@@ -8,6 +8,8 @@ import { LogMiddleware } from './common/middleware/log.middleware';
 import { NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { RequestMethod } from '@nestjs/common';
 import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
+import { UsersModel } from './users/entities/users.entity';
 
 @Module({
   imports: [
@@ -23,11 +25,14 @@ import { AuthModule } from './auth/auth.module';
 			database: configService.get('DB_DATABASE'),
 			synchronize: configService.get('DB_SYNCHRONIZE'),
 			logging: configService.get('DB_LOGGING'),
-			entities: [],
+			entities: [
+				UsersModel,
+			],
 		}),
 	}),
 	CommonModule,
 	AuthModule,
+	UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
