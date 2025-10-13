@@ -36,8 +36,4 @@ export abstract class BaseEntity {
 		default: YnEnum.N,
 	})
 	delYn: YnEnum;
-	
-	// 버전
-	@VersionColumn()
-	version: number;
 }
